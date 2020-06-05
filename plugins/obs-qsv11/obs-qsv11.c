@@ -204,22 +204,41 @@ static bool update_latency(obs_data_t *settings)
 		if (bLooahead) {
 			if (la_depth == 0 || la_depth >= 15)
 				obs_data_set_string(settings, "latency",
-							"normal");
+						    "normal");
 			else
-				obs_data_set_string(settings, "latency",
-							"low");
+				obs_data_set_string(settings, "latency", "low");
 		} else {
 			if (async_depth != 1)
 				obs_data_set_string(settings, "latency",
-							"normal");
+						    "normal");
 			else
 				obs_data_set_string(settings, "latency",
-							"ultra-low");
+						    "ultra-low");
 		}
 
 		obs_data_erase(settings, "async_depth");
 		obs_data_erase(settings, "la_depth");
 	}
+
+	return true;
+}
+
+static bool update_enhancements(obs_data_t *settings)
+{
+	bool mbbrc = true;
+	if (obs_data_item_byname(settings, "mbbrc") != NULL) {
+		mbbrc = (bool)obs_data_get_bool(settings, "mbbrc");
+		obs_data_erase(settings, "mbbrc");
+	}
+
+	bool cqm = false;
+	if (obs_data_item_byname(settings, "CQM") != NULL) {
+		cqm = (bool)obs_data_get_bool(settings, "CQM");
+		obs_data_erase(settings, "CQM");
+	}
+
+	bool enabled = (mbbrc && cqm);
+	obs_data_set_bool(settings, "enhancements", enabled);
 
 	return true;
 }
@@ -266,6 +285,7 @@ static bool rate_control_modified(obs_properties_t *ppts, obs_property_t *p,
 	obs_property_set_visible(p, bVisible);
 
 	update_latency(settings);
+	update_enhancements(settings);
 
 	return true;
 }
@@ -356,6 +376,7 @@ static void update_params(struct obs_qsv *obsqsv, obs_data_t *settings)
 	video_t *video = obs_encoder_video(obsqsv->encoder);
 	const struct video_output_info *voi = video_output_get_info(video);
 	update_latency(settings);
+	update_enhancements(settings);
 
 	const char *target_usage =
 		obs_data_get_string(settings, "target_usage");

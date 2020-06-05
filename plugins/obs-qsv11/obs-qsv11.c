@@ -190,6 +190,40 @@ static inline bool is_skl_or_greater_platform()
 	enum qsv_cpu_platform plat = qsv_get_cpu_platform();
 	return (plat >= QSV_CPU_PLATFORM_SKL);
 }
+
+static bool update_latency(obs_data_t *settings)
+{
+	int async_depth = (int)obs_data_get_int(settings, "async_depth");
+	int la_depth = (int)obs_data_get_int(settings, "la_depth");
+	if (async_depth > 0 || la_depth > 0) {
+		const char *rate_control =
+			obs_data_get_string(settings, "rate_control");
+		bool bLooahead = astrcmpi(rate_control, "LA_CBR") == 0 ||
+				 astrcmpi(rate_control, "LA_VBR") == 0 ||
+				 astrcmpi(rate_control, "LA_ICQ") == 0;
+		if (bLooahead) {
+			if (la_depth == 0 || la_depth >= 15)
+				obs_data_set_string(settings, "latency",
+							"normal");
+			else
+				obs_data_set_string(settings, "latency",
+							"low");
+		} else {
+			if (async_depth != 1)
+				obs_data_set_string(settings, "latency",
+							"normal");
+			else
+				obs_data_set_string(settings, "latency",
+							"ultra-low");
+		}
+
+		obs_data_erase(settings, "async_depth");
+		obs_data_erase(settings, "la_depth");
+	}
+
+	return true;
+}
+
 static bool rate_control_modified(obs_properties_t *ppts, obs_property_t *p,
 				  obs_data_t *settings)
 {
@@ -230,6 +264,8 @@ static bool rate_control_modified(obs_properties_t *ppts, obs_property_t *p,
 		   astrcmpi(rate_control, "VBR") == 0;
 	p = obs_properties_get(ppts, "enhancements");
 	obs_property_set_visible(p, bVisible);
+
+	update_latency(settings);
 
 	return true;
 }
@@ -319,6 +355,7 @@ static void update_params(struct obs_qsv *obsqsv, obs_data_t *settings)
 {
 	video_t *video = obs_encoder_video(obsqsv->encoder);
 	const struct video_output_info *voi = video_output_get_info(video);
+	update_latency(settings);
 
 	const char *target_usage =
 		obs_data_get_string(settings, "target_usage");
